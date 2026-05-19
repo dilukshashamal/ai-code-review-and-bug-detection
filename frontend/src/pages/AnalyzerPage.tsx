@@ -24,6 +24,11 @@ export function AnalyzerPage() {
     );
   }, [review]);
 
+  const currentLanguage = SUPPORTED_LANGUAGES.find((item) => item.value === language);
+  const allIssues = review
+    ? [...review.bugs, ...review.securityIssues, ...review.performanceIssues]
+    : [];
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -44,13 +49,68 @@ export function AnalyzerPage() {
   }
 
   return (
-    <section className="analyzer-grid" aria-labelledby="analyzer-title">
-      <form className="editor-panel" onSubmit={handleSubmit}>
-        <div className="panel-header">
+    <form className="studio-grid" onSubmit={handleSubmit} aria-labelledby="analyzer-title">
+      <section className="studio-panel editor-panel">
+        <div className="workspace-tabs" aria-label="Analyzer modes">
+          <button className="tab-button active" type="button">
+            Prompt
+          </button>
+          <button className="tab-button" type="button">
+            Code
+          </button>
+          <button className="tab-button" type="button">
+            Review
+          </button>
+        </div>
+
+        <div className="prompt-header">
           <div>
             <p className="eyebrow">Analyzer</p>
-            <h2 id="analyzer-title">Submit code for review</h2>
+            <h2 id="analyzer-title">Code review prompt</h2>
           </div>
+          <div className="prompt-meta" aria-label="Current run metadata">
+            <span>{currentLanguage?.label ?? language}</span>
+            <span>{code.trim().length.toLocaleString()} chars</span>
+          </div>
+        </div>
+
+        <textarea
+          aria-label="Source code"
+          className="code-input"
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+          placeholder="Paste source code here."
+          spellCheck={false}
+        />
+
+        <div className="composer-bar">
+          <div className="composer-tools" aria-label="Editor tools">
+            <button type="button" title="Attach file" aria-label="Attach file">
+              +
+            </button>
+            <button type="button" title="Clear editor" aria-label="Clear editor" onClick={() => setCode("")}>
+              x
+            </button>
+          </div>
+          <button className="run-button" type="submit" disabled={!canSubmit}>
+            {loading ? "Running" : "Run"}
+          </button>
+        </div>
+      </section>
+
+      <aside className="studio-panel settings-panel" id="run-settings" aria-label="Run settings">
+        <div className="panel-heading">
+          <p className="eyebrow">Run settings</p>
+          <h2>Configuration</h2>
+        </div>
+
+        <label className="field-stack">
+          <span>Model</span>
+          <input value="Azure Foundry / GPT-5.4" readOnly />
+        </label>
+
+        <label className="field-stack">
+          <span>Language</span>
           <select
             aria-label="Programming language"
             value={language}
@@ -62,51 +122,49 @@ export function AnalyzerPage() {
               </option>
             ))}
           </select>
-        </div>
-        <div className="metadata-row">
-          <label>
-            <span>Title</span>
-            <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="Authentication helper"
-            />
-          </label>
-          <label>
-            <span>Context</span>
-            <input
-              value={context}
-              onChange={(event) => setContext(event.target.value)}
-              placeholder="Backend API, utility function, UI component"
-            />
-          </label>
-        </div>
-        <textarea
-          aria-label="Source code"
-          className="code-input"
-          value={code}
-          onChange={(event) => setCode(event.target.value)}
-          placeholder="Paste source code here."
-          spellCheck={false}
-        />
-        <div className="action-row">
-          <p>{code.trim().length.toLocaleString()} characters ready</p>
-          <button type="submit" disabled={!canSubmit}>
-            {loading ? "Analyzing..." : "Analyze"}
-          </button>
-        </div>
-      </form>
+        </label>
 
-      <aside className="result-panel" aria-label="Review result preview">
+        <label className="field-stack">
+          <span>Title</span>
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Authentication helper"
+          />
+        </label>
+
+        <label className="field-stack">
+          <span>Context</span>
+          <textarea
+            className="context-input"
+            value={context}
+            onChange={(event) => setContext(event.target.value)}
+            placeholder="Backend API, utility function, UI component"
+          />
+        </label>
+
+        <div className="settings-summary" aria-label="Analysis summary">
+          <div>
+            <span>Static rules</span>
+            <strong>On</strong>
+          </div>
+          <div>
+            <span>LLM review</span>
+            <strong>On</strong>
+          </div>
+        </div>
+      </aside>
+
+      <section className="studio-panel result-panel" id="review-output" aria-label="Review result">
         <div className="result-heading">
           <div>
-            <p className="eyebrow">Report</p>
+            <p className="eyebrow">Output</p>
             <h2>Review result</h2>
           </div>
-          {review ? <strong>{review.overallScore}</strong> : null}
+          {review ? <strong>{review.overallScore}</strong> : <span className="score-placeholder">--</span>}
         </div>
 
-        {loading ? <div className="empty-state">Running GraphQL analysis...</div> : null}
+        {loading ? <div className="empty-state">Running analysis...</div> : null}
 
         {error ? (
           <div className="error-state" role="alert">
@@ -115,23 +173,25 @@ export function AnalyzerPage() {
         ) : null}
 
         {!loading && !error && !review ? (
-          <div className="empty-state">Submit code to see structured feedback.</div>
+          <div className="empty-state">No review generated yet.</div>
         ) : null}
 
         {!loading && !error && review ? (
-          <ReviewSummary review={review} issueCount={issueCount} />
+          <ReviewSummary review={review} issueCount={issueCount} issues={allIssues} />
         ) : null}
-      </aside>
-    </section>
+      </section>
+    </form>
   );
 }
 
 function ReviewSummary({
   review,
   issueCount,
+  issues,
 }: {
   review: CodeReview;
   issueCount: number;
+  issues: Issue[];
 }) {
   return (
     <div className="review-summary">
@@ -148,18 +208,16 @@ function ReviewSummary({
 
       <p className="summary-copy">{review.summary}</p>
 
-      <IssueGroup title="Bugs" issues={review.bugs} />
-      <IssueGroup title="Security" issues={review.securityIssues} />
-      <IssueGroup title="Performance" issues={review.performanceIssues} />
+      <IssueGroup issues={issues} />
       <SuggestionGroup suggestions={review.suggestions} />
     </div>
   );
 }
 
-function IssueGroup({ title, issues }: { title: string; issues: Issue[] }) {
+function IssueGroup({ issues }: { issues: Issue[] }) {
   return (
     <section className="result-section">
-      <h3>{title}</h3>
+      <h3>Findings</h3>
       {issues.length === 0 ? (
         <p>No findings returned.</p>
       ) : (
