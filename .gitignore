@@ -1,0 +1,42 @@
+# Codex local runtime, while keeping repo skills reviewable
+.codex/*
+!.codex/skills/
+!.codex/skills/**
+
+# Environment files
+.env
+.env.*
+!.env.example
+!frontend/.env.example
+!backend/.env.example
+
+# Node / frontend
+node_modules/
+dist/
+build/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Python / backend
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+htmlcov/
+.coverage
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+docs
+.codex

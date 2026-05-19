@@ -720,6 +720,8 @@ VITE_GRAPHQL_ENDPOINT=http://localhost:8000/graphql
 
 ## Installation Guide
 
+Current local development details are tracked in `docs/development.md`.
+
 ## 1. Clone the Repository
 
 ```bash
@@ -740,7 +742,7 @@ npm run dev
 Frontend will run on:
 
 ```txt
-http://localhost:5173
+http://127.0.0.1:5173
 ```
 
 ---
@@ -749,23 +751,24 @@ http://localhost:5173
 
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Backend will run on:
 
 ```txt
-http://localhost:8000
+http://127.0.0.1:8000
 ```
 
 GraphQL endpoint:
 
 ```txt
-http://localhost:8000/graphql
+http://127.0.0.1:8000/graphql
 ```
+
+If port `8000` is blocked on your machine, run the backend on `8080` and set `VITE_GRAPHQL_ENDPOINT=http://127.0.0.1:8080/graphql` before starting the frontend.
 
 ---
 
