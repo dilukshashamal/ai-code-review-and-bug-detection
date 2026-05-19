@@ -1,5 +1,5 @@
 fastapi>=0.136.1,<0.137.0
-google-genai>=2.4.0,<3.0.0
+openai>=2.36.0,<3.0.0
 pydantic-settings>=2.14.1,<2.15.0
 python-dotenv>=1.1.0,<2.0.0
 strawberry-graphql[fastapi]>=0.315.5,<0.316.0

@@ -705,7 +705,14 @@ Create a `.env` file in the backend folder.
 
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/code_review_db
-OPENAI_API_KEY=your_api_key_here
+ENABLE_LLM_REVIEW=true
+LLM_REVIEW_PROVIDER=azure_foundry
+AZURE_FOUNDRY_ENDPOINT=your_target_uri_or_base_url
+AZURE_FOUNDRY_KEY=your_api_key_here
+AZURE_FOUNDRY_MODEL=gpt-5.4
+AZURE_FOUNDRY_API_VERSION=preview
+AZURE_FOUNDRY_REASONING_EFFORT=medium
+AZURE_FOUNDRY_MAX_COMPLETION_TOKENS=5000
 JWT_SECRET=your_jwt_secret_here
 GRAPHQL_DEBUG=true
 ```

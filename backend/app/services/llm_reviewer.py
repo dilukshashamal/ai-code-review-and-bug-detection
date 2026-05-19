@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Protocol
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 from pydantic import BaseModel, Field, ValidationError
 
@@ -32,7 +33,7 @@ class LlmReview(BaseModel):
     suggestions: list[LlmSuggestion] = Field(default_factory=list, max_length=6)
 
 
-class GeminiReviewError(RuntimeError):
+class LlmReviewError(RuntimeError):
     def __init__(self, message: str, *, reason: str = "unavailable") -> None:
         super().__init__(message)
         self.reason = reason
@@ -43,71 +44,109 @@ class CodeReviewer(Protocol):
         ...
 
 
-class GeminiCodeReviewer:
-    def __init__(self, *, api_key: str, model: str, fallback_model: str | None = None) -> None:
+class AzureFoundryCodeReviewer:
+    def __init__(
+        self,
+        *,
+        endpoint: str,
+        api_key: str,
+        model: str,
+        api_version: str | None = None,
+        reasoning_effort: str = "medium",
+        max_completion_tokens: int = 5000,
+    ) -> None:
+        self.base_url = normalize_foundry_base_url(endpoint)
         self.api_key = api_key
         self.model = model
-        self.fallback_model = fallback_model
+        self.api_version = api_version or "preview"
+        self.reasoning_effort = reasoning_effort
+        self.max_completion_tokens = max_completion_tokens
 
     def review(self, *, language: str, code: str, context: str | None, base: AnalysisResult) -> LlmReview:
-        from google import genai
-        from google.genai import types
+        from openai import AzureOpenAI
 
         prompt = build_review_prompt(language=language, code=code, context=context, base=base)
-        client = genai.Client(api_key=self.api_key)
+        client = AzureOpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            api_version=self.api_version,
+        )
 
         try:
-            response = generate_with_fallback(
-                client=client,
-                types=types,
-                models=[self.model, self.fallback_model],
-                prompt=prompt,
+            response = client.responses.create(
+                model=self.model,
+                instructions=(
+                    "You are a senior code reviewer. Return only JSON matching "
+                    "the requested schema."
+                ),
+                input=prompt,
+                max_output_tokens=self.max_completion_tokens,
+                reasoning={"effort": self.reasoning_effort},
+                text={"format": {"type": "json_object"}},
             )
+        except Exception as exc:
+            raise LlmReviewError(
+                str(exc),
+                reason="quota_exceeded" if is_quota_error(exc) else "unavailable",
+            ) from exc
         finally:
             client.close()
 
-        if isinstance(response.parsed, LlmReview):
-            return response.parsed
-
-        return parse_llm_review(response.text or "")
+        text = response.output_text
+        return parse_llm_review(text or "")
 
 
-def generate_with_fallback(*, client, types, models: list[str | None], prompt: str):
-    last_error: Exception | None = None
-    for model in [model for model in models if model]:
-        try:
-            return client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.2,
-                    max_output_tokens=1600,
-                    response_mime_type="application/json",
-                    response_schema=LlmReview,
-                ),
-            )
-        except Exception as exc:
-            last_error = exc
-            if not is_retryable_gemini_error(exc):
-                raise
+def normalize_foundry_base_url(target_uri: str) -> str:
+    """Accept a Foundry base URL or a full responses/chat completions target URI."""
+    parsed = urlsplit(target_uri.strip())
+    path = parsed.path.rstrip("/")
+    segments = [segment for segment in path.split("/") if segment]
 
-    if last_error is not None:
-        raise GeminiReviewError(
-            str(last_error),
-            reason="quota_exceeded" if is_quota_error(last_error) else "unavailable",
-        ) from last_error
+    if len(segments) >= 3 and segments[-2:] == ["chat", "completions"]:
+        segments = segments[:-2]
 
-    raise ValueError("No Gemini model configured.")
+    if segments and segments[-1] == "responses":
+        segments = segments[:-1]
+
+    if "openai" in segments:
+        openai_index = segments.index("openai")
+        if len(segments) <= openai_index + 1 or segments[openai_index + 1] != "v1":
+            segments = [*segments[: openai_index + 1], "v1"]
+        else:
+            segments = segments[: openai_index + 2]
+
+    path = "/" + "/".join(segments) if segments else ""
+    normalized = urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+    return normalized.rstrip("/") + "/"
 
 
-def is_retryable_gemini_error(exc: Exception) -> bool:
+def extract_api_version(target_uri: str) -> str | None:
+    parsed = urlsplit(target_uri.strip())
+    versions = parse_qs(parsed.query).get("api-version")
+    return versions[0] if versions else None
+
+
+def is_retryable_llm_error(exc: Exception) -> bool:
     text = str(exc).upper()
-    return "503" in text or "UNAVAILABLE" in text or "RESOURCE_EXHAUSTED" in text
+    retryable_markers = (
+        "408",
+        "429",
+        "500",
+        "502",
+        "503",
+        "504",
+        "RATE",
+        "RESOURCE_EXHAUSTED",
+        "TIMEOUT",
+        "TOO MANY REQUESTS",
+        "UNAVAILABLE",
+    )
+    return any(marker in text for marker in retryable_markers)
 
 
 def is_quota_error(exc: Exception) -> bool:
     text = str(exc).upper()
-    return "429" in text or "RESOURCE_EXHAUSTED" in text or "QUOTA" in text
+    return "429" in text or "RESOURCE_EXHAUSTED" in text or "QUOTA" in text or "RATE LIMIT" in text
 
 
 def build_review_prompt(
@@ -163,10 +202,12 @@ def parse_llm_review(raw_text: str) -> LlmReview:
         payload = json.loads(text)
         return LlmReview.model_validate(payload)
     except (json.JSONDecodeError, ValidationError) as exc:
-        raise ValueError("Gemini returned an invalid review payload.") from exc
+        raise ValueError("LLM reviewer returned an invalid review payload.") from exc
 
 
-def merge_llm_review(base: AnalysisResult, llm_review: LlmReview | None) -> AnalysisResult:
+def merge_llm_review(
+    base: AnalysisResult, llm_review: LlmReview | None, *, provider_name: str = "Azure Foundry"
+) -> AnalysisResult:
     if llm_review is None:
         return base
 
@@ -192,7 +233,7 @@ def merge_llm_review(base: AnalysisResult, llm_review: LlmReview | None) -> Anal
     ]
 
     score = max(0, min(100, base.overall_score + llm_review.score_adjustment))
-    summary = f"{base.summary} Gemini review: {llm_review.summary}"
+    summary = f"{base.summary} {provider_name} review: {llm_review.summary}"
 
     return AnalysisResult(
         overall_score=score,

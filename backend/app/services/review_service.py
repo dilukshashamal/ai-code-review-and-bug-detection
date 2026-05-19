@@ -3,14 +3,14 @@ from datetime import UTC, datetime
 import logging
 from uuid import uuid4
 
+from app.core.config import get_settings
 from app.graphql.inputs import CodeInput
 from app.graphql.types import CodeReview, DashboardStats, Suggestion
-from app.core.config import get_settings
 from app.services.analyzer import analyze_source_code, normalize_language
 from app.services.llm_reviewer import (
+    AzureFoundryCodeReviewer,
     CodeReviewer,
-    GeminiCodeReviewer,
-    GeminiReviewError,
+    LlmReviewError,
     merge_llm_review,
 )
 
@@ -45,46 +45,46 @@ class ReviewService:
                     base=analysis,
                 )
                 analysis = merge_llm_review(analysis, llm_review)
-            except GeminiReviewError as exc:
-                logger.warning("Gemini review failed: %s", exc)
+            except LlmReviewError as exc:
+                logger.warning("Azure Foundry review failed: %s", exc)
                 if exc.reason == "quota_exceeded":
-                    title = "Gemini quota exceeded"
+                    suggestion_title = "Azure Foundry quota exceeded"
                     explanation = (
-                        "The deterministic rule-based review completed, but Gemini returned "
+                        "The deterministic rule-based review completed, but Azure Foundry returned "
                         "a quota or rate-limit error for the configured API key/model."
                     )
                 else:
-                    title = "Gemini review unavailable"
+                    suggestion_title = "Azure Foundry review unavailable"
                     explanation = (
-                        "The deterministic rule-based review completed, but the Gemini "
+                        "The deterministic rule-based review completed, but the Azure Foundry "
                         "review layer could not return a valid response."
                     )
                 analysis.suggestions.append(
                     Suggestion(
-                        title=title,
+                        title=suggestion_title,
                         explanation=explanation,
                         improved_code=None,
                     )
                 )
             except Exception as exc:
-                logger.warning("Gemini review failed: %s", exc)
+                logger.warning("Azure Foundry review failed: %s", exc)
                 analysis.suggestions.append(
                     Suggestion(
-                        title="Gemini review unavailable",
+                        title="Azure Foundry review unavailable",
                         explanation=(
-                            "The deterministic rule-based review completed, but the Gemini "
+                            "The deterministic rule-based review completed, but the Azure Foundry "
                             "review layer could not return a valid response."
                         ),
                         improved_code=None,
                     )
                 )
-        elif get_settings().enable_gemini_review:
+        elif get_settings().enable_llm_review:
             analysis.suggestions.append(
                 Suggestion(
-                    title="Gemini review not configured",
+                    title="Azure Foundry review not configured",
                     explanation=(
-                        "Add GEMINI_API_KEY or GOOGLE_API_KEY to backend/.env and restart "
-                        "the backend to enable Gemini reasoning."
+                        "Add AZURE_FOUNDRY_ENDPOINT and AZURE_FOUNDRY_KEY to backend/.env "
+                        "and restart the backend to enable Azure Foundry reasoning."
                     ),
                     improved_code=None,
                 )
@@ -128,14 +128,22 @@ class ReviewService:
 
 def build_default_reviewer() -> CodeReviewer | None:
     settings = get_settings()
-    gemini_api_key = settings.resolved_gemini_api_key
-    if not settings.enable_gemini_review or not gemini_api_key:
+    if not settings.enable_llm_review:
         return None
 
-    return GeminiCodeReviewer(
-        api_key=gemini_api_key,
-        model=settings.gemini_model,
-        fallback_model=settings.gemini_fallback_model,
+    if settings.llm_review_provider.lower() != "azure_foundry":
+        return None
+
+    if not settings.azure_foundry_endpoint or not settings.azure_foundry_key:
+        return None
+
+    return AzureFoundryCodeReviewer(
+        endpoint=settings.azure_foundry_endpoint,
+        api_key=settings.azure_foundry_key,
+        model=settings.azure_foundry_model,
+        api_version=settings.azure_foundry_api_version,
+        reasoning_effort=settings.azure_foundry_reasoning_effort,
+        max_completion_tokens=settings.azure_foundry_max_completion_tokens,
     )
 
 

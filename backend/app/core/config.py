@@ -12,15 +12,23 @@ class Settings(BaseSettings):
         default="postgresql://postgres:postgres@localhost:5432/code_review_db",
         alias="DATABASE_URL",
     )
-    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
-    gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
-    google_api_key: str | None = Field(default=None, alias="GOOGLE_API_KEY")
-    gemini_model: str = Field(default="gemini-2.5-flash", alias="GEMINI_MODEL")
-    gemini_fallback_model: str | None = Field(
-        default="gemini-2.0-flash",
-        alias="GEMINI_FALLBACK_MODEL",
+    enable_llm_review: bool = Field(default=True, alias="ENABLE_LLM_REVIEW")
+    llm_review_provider: str = Field(default="azure_foundry", alias="LLM_REVIEW_PROVIDER")
+    azure_foundry_endpoint: str | None = Field(default=None, alias="AZURE_FOUNDRY_ENDPOINT")
+    azure_foundry_key: str | None = Field(default=None, alias="AZURE_FOUNDRY_KEY")
+    azure_foundry_model: str = Field(default="gpt-5.4", alias="AZURE_FOUNDRY_MODEL")
+    azure_foundry_api_version: str | None = Field(
+        default=None,
+        alias="AZURE_FOUNDRY_API_VERSION",
     )
-    enable_gemini_review: bool = Field(default=True, alias="ENABLE_GEMINI_REVIEW")
+    azure_foundry_reasoning_effort: str = Field(
+        default="medium",
+        alias="AZURE_FOUNDRY_REASONING_EFFORT",
+    )
+    azure_foundry_max_completion_tokens: int = Field(
+        default=5000,
+        alias="AZURE_FOUNDRY_MAX_COMPLETION_TOKENS",
+    )
     jwt_secret: str = Field(default="change-me-in-local-env", alias="JWT_SECRET")
     graphql_debug: bool = Field(default=True, alias="GRAPHQL_DEBUG")
     frontend_origins: str = Field(
@@ -34,10 +42,6 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=False,
     )
-
-    @property
-    def resolved_gemini_api_key(self) -> str | None:
-        return self.gemini_api_key or self.google_api_key
 
 
 @lru_cache
