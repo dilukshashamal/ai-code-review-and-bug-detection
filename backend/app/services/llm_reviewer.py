@@ -27,6 +27,7 @@ class LlmSuggestion(BaseModel):
 class LlmReview(BaseModel):
     summary: str = Field(min_length=20, max_length=900)
     score_adjustment: int = Field(default=0, ge=-20, le=10)
+    corrected_code: str | None = Field(default=None, max_length=20000)
     bugs: list[LlmIssue] = Field(default_factory=list, max_length=5)
     security_issues: list[LlmIssue] = Field(default_factory=list, max_length=5)
     performance_issues: list[LlmIssue] = Field(default_factory=list, max_length=5)
@@ -159,6 +160,7 @@ Review the submitted {language} code and return ONLY valid JSON matching this sh
 {{
   "summary": "short practical review summary",
   "score_adjustment": -20,
+  "corrected_code": "complete corrected code when a safe fix is possible, otherwise null",
   "bugs": [
     {{"title": "...", "severity": "LOW|MEDIUM|HIGH|CRITICAL", "line": 1, "explanation": "...", "suggestion": "..."}}
   ],
@@ -176,6 +178,14 @@ Rules:
 - Never include markdown fences.
 - Preserve the deterministic security baseline; do not lower severity for known security risks.
 - Use score_adjustment from -20 to 10 only.
+- When the code has a clear bug, syntax issue, security risk, or production-readiness issue,
+  return corrected_code as the full corrected snippet in the same language.
+- Return corrected_code as null when no code change is needed or a safe full correction
+  cannot be made from the submitted snippet.
+- If fixing a secret, do not invent a real replacement secret. Use an environment variable,
+  configuration reference, or a clearly named placeholder.
+- Keep suggestion improved_code values as focused snippets only; corrected_code is the
+  complete corrected version.
 
 Submitted context:
 {context or "No additional context provided."}
@@ -220,6 +230,7 @@ def merge_llm_review(
         *base.performance_issues,
         *[to_issue(issue) for issue in llm_review.performance_issues],
     ]
+    corrected_code = llm_review.corrected_code or first_improved_code(llm_review)
     suggestions = [
         *base.suggestions,
         *[
@@ -238,11 +249,19 @@ def merge_llm_review(
     return AnalysisResult(
         overall_score=score,
         summary=summary,
+        corrected_code=corrected_code,
         bugs=dedupe_issues(bugs),
         security_issues=dedupe_issues(security_issues),
         performance_issues=dedupe_issues(performance_issues),
         suggestions=dedupe_suggestions(suggestions),
     )
+
+
+def first_improved_code(llm_review: LlmReview) -> str | None:
+    for suggestion in llm_review.suggestions:
+        if suggestion.improved_code and suggestion.improved_code.strip():
+            return suggestion.improved_code
+    return None
 
 
 def to_issue(issue: LlmIssue) -> Issue:

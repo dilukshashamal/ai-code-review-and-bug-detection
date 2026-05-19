@@ -19,6 +19,12 @@ class FakeReviewer:
         return LlmReview(
             summary="The function needs clearer input validation and a narrower return path.",
             score_adjustment=-7,
+            corrected_code=(
+                "def total(items):\n"
+                "    if not items:\n"
+                "        return 0\n"
+                "    return sum(items)"
+            ),
             bugs=[
                 LlmIssue(
                     title="Missing empty input branch",
@@ -57,6 +63,8 @@ def test_review_service_merges_azure_foundry_style_review() -> None:
 
     assert review.overall_score == 93
     assert "Azure Foundry review:" in review.summary
+    assert review.corrected_code is not None
+    assert "if not items" in review.corrected_code
     assert review.bugs[0].title == "Missing empty input branch"
     assert review.suggestions[-1].title == "Clarify function contract"
 

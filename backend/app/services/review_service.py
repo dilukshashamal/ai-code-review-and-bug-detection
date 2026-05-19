@@ -95,6 +95,7 @@ class ReviewService:
             title=title,
             language=normalize_language(language),
             submitted_code=input.code,
+            corrected_code=analysis.corrected_code,
             overall_score=analysis.overall_score,
             summary=analysis.summary,
             bugs=analysis.bugs,

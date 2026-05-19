@@ -177,7 +177,12 @@ export function AnalyzerPage() {
         ) : null}
 
         {!loading && !error && review ? (
-          <ReviewSummary review={review} issueCount={issueCount} issues={allIssues} />
+          <ReviewSummary
+            review={review}
+            issueCount={issueCount}
+            issues={allIssues}
+            onApplyCorrection={setCode}
+          />
         ) : null}
       </section>
     </form>
@@ -188,10 +193,12 @@ function ReviewSummary({
   review,
   issueCount,
   issues,
+  onApplyCorrection,
 }: {
   review: CodeReview;
   issueCount: number;
   issues: Issue[];
+  onApplyCorrection: (code: string) => void;
 }) {
   return (
     <div className="review-summary">
@@ -208,9 +215,38 @@ function ReviewSummary({
 
       <p className="summary-copy">{review.summary}</p>
 
+      <CorrectedCode code={review.correctedCode} onApplyCorrection={onApplyCorrection} />
       <IssueGroup issues={issues} />
       <SuggestionGroup suggestions={review.suggestions} />
     </div>
+  );
+}
+
+function CorrectedCode({
+  code,
+  onApplyCorrection,
+}: {
+  code?: string | null;
+  onApplyCorrection: (code: string) => void;
+}) {
+  return (
+    <section className="result-section corrected-code-section">
+      <div className="section-title-row">
+        <h3>Corrected code</h3>
+        {code ? (
+          <button type="button" onClick={() => onApplyCorrection(code)}>
+            Apply correction
+          </button>
+        ) : null}
+      </div>
+      {code ? (
+        <pre className="corrected-code-block">
+          <code>{code}</code>
+        </pre>
+      ) : (
+        <p>No full corrected snippet returned.</p>
+      )}
+    </section>
   );
 }
 
@@ -247,6 +283,11 @@ function SuggestionGroup({ suggestions }: { suggestions: Suggestion[] }) {
             <li key={suggestion.title}>
               <strong>{suggestion.title}</strong>
               <p>{suggestion.explanation}</p>
+              {suggestion.improvedCode ? (
+                <pre className="inline-code-block">
+                  <code>{suggestion.improvedCode}</code>
+                </pre>
+              ) : null}
             </li>
           ))}
         </ul>

@@ -7,6 +7,7 @@ export const ANALYZE_CODE_MUTATION = gql`
       title
       language
       submittedCode
+      correctedCode
       overallScore
       summary
       bugs {

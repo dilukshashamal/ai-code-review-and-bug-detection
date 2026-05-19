@@ -23,6 +23,7 @@ class AnalyzerFinding:
 class AnalysisResult:
     overall_score: int
     summary: str
+    corrected_code: str | None
     bugs: list[Issue]
     security_issues: list[Issue]
     performance_issues: list[Issue]
@@ -151,6 +152,7 @@ def analyze_source_code(language: str, code: str, context: str | None = None) ->
     return AnalysisResult(
         overall_score=score,
         summary=build_summary(score, findings),
+        corrected_code=None,
         bugs=[finding.issue for finding in findings if finding.issue_type is IssueType.BUG],
         security_issues=[
             finding.issue for finding in findings if finding.issue_type is IssueType.SECURITY

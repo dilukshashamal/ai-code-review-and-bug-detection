@@ -26,6 +26,7 @@ export type CodeReview = {
   title?: string | null;
   language: string;
   submittedCode: string;
+  correctedCode?: string | null;
   overallScore: number;
   summary: string;
   bugs: Issue[];

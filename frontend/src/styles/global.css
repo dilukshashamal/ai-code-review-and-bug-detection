@@ -482,6 +482,54 @@ button {
   font-size: 14px;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.section-title-row h3 {
+  margin: 0;
+}
+
+.section-title-row button {
+  min-height: 30px;
+  border: 1px solid #d2e3fc;
+  border-radius: 999px;
+  background: #f4f8ff;
+  color: #174ea6;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 12px;
+}
+
+.section-title-row button:hover {
+  background: #e8f0fe;
+}
+
+.corrected-code-block,
+.inline-code-block {
+  max-width: 100%;
+  margin: 0;
+  overflow: auto;
+  border: 1px solid #dde3ea;
+  border-radius: 8px;
+  background: #f8fafd;
+  color: #1f1f1f;
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 12px;
+  white-space: pre;
+}
+
+.inline-code-block {
+  margin-top: 4px;
+}
+
 .result-section ul {
   display: grid;
   gap: 10px;

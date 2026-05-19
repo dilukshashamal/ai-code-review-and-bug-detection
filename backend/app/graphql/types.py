@@ -33,6 +33,7 @@ class CodeReview:
     title: str | None
     language: str
     submitted_code: str
+    corrected_code: str | None
     overall_score: int
     summary: str
     bugs: list[Issue]

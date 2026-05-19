@@ -15,6 +15,7 @@ def test_analyze_code_mutation_returns_structured_review() -> None:
                     id
                     language
                     submittedCode
+                    correctedCode
                     overallScore
                     summary
                     bugs { title severity line explanation suggestion }
